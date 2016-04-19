@@ -1,12 +1,12 @@
 /****************
  * Global variables
  ***************/
- 
+
 int LED = D7;
 
 enum States {
     STATE_INIT,
-    STATE_LOGIN, 
+    STATE_LOGIN,
     STATE_RUNNING,
     STATE_CONFIG,
     STATE_ERROR
@@ -32,7 +32,7 @@ struct LocoDescriptor {
     boolean F2 = false;
     boolean F3 = false;
     boolean F4 = false;
-    
+
 };
 // real loco values
 LocoDescriptor my_loco;
@@ -46,22 +46,18 @@ Timer alive_timer(3000, f_send_alive);
  * Logging
  ***************/
 boolean LOGGING = true;
- 
+
 TCPClient log_client;
 int log_port = 7247;
 
-void f_log(String* mgs) {
-	
+void f_log(char* msg) {
+
     if ( LOGGING ) {
         if (log_client.connect(server, log_port)) {
-        	       String log_msg = "LOG ";
-        	       log_msg.concat(System.deviceID());
-        	       log_msg.concat( String::format(": ") );
-        	       log_msg.concat(msg);
-                log_client.println( &log_msg );
-            }  
-            log_client.stop();            
+            log_client.println( msg );
         }
+        log_client.stop();
+    }
 }
 
 
@@ -81,7 +77,7 @@ void f_msg_alive(char* msg_char) {
     String msg_string = String("ALIVE|");
     msg_string.concat(System.deviceID());
     msg_string.concat(String::format("#%u|%u|%u#%u|%u|%u#%u|%u|%u|%u", \
-                                        my_loco.loco_real_speed, my_loco.loco_target_speed, my_loco.direction, \ 
+                                        my_loco.loco_real_speed, my_loco.loco_target_speed, my_loco.direction, \
                                         my_loco.light_auto, my_loco.light_front, my_loco.light_rear, \
                                         my_loco.F1, my_loco.F2, my_loco.F3, my_loco.F4));
     msg_string.toCharArray(msg_char, 64);
@@ -91,7 +87,7 @@ boolean f_make_bool(int val) {
 	  return (1 && val );
 }
 
-void f_read_msg_command(char* msg_char) {
+/*void f_read_msg_command(char* msg_char) {
     // update my_loco here
     //RGB.color(0, 0, 255);
     // Get main message splitters
@@ -117,26 +113,25 @@ void f_read_msg_command(char* msg_char) {
     // light rear
     cmd = msg_str.substring(subsplit2+1, split_3);
     widcc_command.light_rear = f_make_bool(cmd.toInt());
-    
-    // extra functions F1-F4 not implemented
-}
 
-/*
-boolean f_check_dev_id(String* msg) {
-	  // reply is in the form:
-	  // "COMMAND|LOCO_ID#other_params"
-	  int splitter_1 = *msg.indexOf('#');
-    int splitter_2 = *msg.indexOf('|');
-    String cmd_loco_id = *msg.substring( splitter_2 + 1, splitter_1);
-    return cmd_loco_id.equals(System.deviceID());
+    // extra functions F1-F4 not implemented
 }*/
 
-boolean f_check_cmd_id(char* msg, char* cmd, char* id) {
-	  char sys_id[32] = "";
-	  sscanf(mgs,"%s|%s#%*s", cmd, id);
-	  String dev_id = System.deviceID();
+boolean f_check_cmd_id(String* msg, String* cmd) {
+	  //char sys_id[32];
+	  //snprintf(sys_id, 32, "CHECK");
+	  //f_log(sys_id);
+	  //f_log(msg);
+	  //sscanf(msg,"%s|%s#%*s", cmd, id);
+	  //f_log(cmd);
+	  //f_log(id);
+	  String dev_id = msg->substring(msg->indexOf("|")+1, msg->indexOf("#"));
+	  cmd->concat( msg->substring(0, msg->indexOf("|")) );
+	  //System.deviceID();
 	  //how to compare char* & string?
-	  dev_id.toCharArray(sys_id, 32);
+
+	  //dev_id.toCharArray(sys_id, 32);
+	  //f_log(sys_id);
 	  if (!strncmp(id, sys_id, 32)) {
 	  	    return true;
 	  }
@@ -151,7 +146,9 @@ boolean f_check_cmd_id(char* msg, char* cmd, char* id) {
 
 void f_state_init() {
     // wait for wifi to be ready
-    //digitalWrite(LED, HIGH); 
+    //digitalWrite(LED, HIGH);
+    char log_msg[] = "STATUS INIT";
+    f_log(log_msg);
     if (WiFi.ready()) {
     	    my_state = STATE_LOGIN;
     }
@@ -161,15 +158,19 @@ void f_state_init() {
 }
 
 void f_state_login() {
+    char log_msg[] = "STATUS LOGIN";
+    f_log(log_msg);
     if (WiFi.ready()) {
         // open TCP client and connect
         if (widcc_client.connect(server, port)) {
+            //char log_msg2[] = "TCP connected";
+            //f_log(log_msg2);
             // prepare a login message and se
-            char widcc_login_msg[64]; 
+            char widcc_login_msg[64];
             f_msg_login(widcc_login_msg);
             widcc_client.println( widcc_login_msg );
-            
-            String reply = ""; 
+
+            String reply = "";
             // loop to get the reply
             while (widcc_client.connected()) {
                 if (widcc_client.available()) {
@@ -177,12 +178,12 @@ void f_state_login() {
                 }
             }
             widcc_client.stop();
-            
+
             // read t TODOhe reply
-            
+
             if (reply.indexOf("OK") != -1) {
     	           // in case of successful login, activate
-    	           // the alive timer which regularly 
+    	           // the alive timer which regularly
     	           // contacts the server
                    alive_timer.start();
                    my_state = STATE_RUNNING;
@@ -197,6 +198,8 @@ void f_state_login() {
 }
 
 void f_state_running() {
+    char log_msg[] = "STATUS RUNNING";
+    f_log(log_msg);
     if (!WiFi.ready()) {
         my_state = STATE_INIT;
         alive_timer.stop();
@@ -211,56 +214,45 @@ void f_state_running() {
 }
 
 void f_send_alive() {
+    char log_msg[] = "ALIVE";
+    f_log(log_msg);
     if (widcc_client.connect(server, port)) {
         char widcc_message[64];
         f_msg_alive( widcc_message );
         widcc_client.println( widcc_message );
-            
-        //String reply = ""; 
-        char widcc_reply[64] = "";
-            
+
+        String widcc_reply = "";
+        //char widcc_reply[64];
+
         while (widcc_client.connected()) {
             if (widcc_client.available()) {
-                //reply.concat(String::format("%c", client.read()));
-                strncat(widcc_reply, client.read(), 1);
+                widcc_reply.concat(String::format("%c", client.read()));
+                //char c;
+                //c = widcc_client.read();
+                //strncat(widcc_reply, (char*)widcc_client.read(), 1);
             }
         }
         widcc_client.stop();
 
-        /*
-        int splitter = reply.indexOf('#');
-        String command_id = reply.substring(0, splitter);
-        int splitter_2 = command_id.indexOf('|');
-        String command = command_id.substring(0, splitter_2);
-        String cmd_loco_id = command_id.substring( splitter_2 + 1, command_id.length());
-        
-        //to be removed!!!
-        if (1) {
-           TCPClient sub_client;
-    
-            if (sub_client.connect({ 192, 168, 1, 109 }, 7247)) {
-                //sub_client.println( command );
-                sub_client.println( cmd_loco_id );
-            }  
-            sub_client.stop();            
-        }*/
-        
-        char cmd[16];
-        char id[32];
-        
-        if ( f_check_dev_id(widcc_reply, cmd, id)) {
+        //strncat(widcc_reply, , 1);
+
+        String cmd;
+        //String id[32];
+
+
+        if ( f_check_cmd_id(&widcc_reply, &cmd)) {
         	   //char command[16] = f_check_command(&reply);
            	 //RGB.color(255, 0, 255);
             // Todo switch
-            if ( !strncmp(cmd, "OK", 2) )
-            //if (command.compareTo("OK") == 0) {
+            //if ( !strncmp(cmd, "OK", 2) ) {
+            if (command.compareTo("OK") == 0) {
                 RGB.color(0, 255, 0);
             }
             else if ( !strncmp(cmd, "COMMAND", 7)) {
                 //RGB.color(0, 0, 255);
                 //char widcc_reply[64];
                 //reply.toCharArray(widcc_reply, 64);
-                f_read_msg_command( widcc_reply );
+                //f_read_msg_command( widcc_reply );
             }
             else if ( !strncmp(cmd, "UPDATE", 6)) {
             }
@@ -285,11 +277,11 @@ void f_send_alive() {
 
 
 void setup() {
-    
-    pinMode(LED, OUTPUT); 
-    
+
+    pinMode(LED, OUTPUT);
+
     RGB.control(true);
-    
+
     my_state = STATE_INIT;
 
 }
@@ -302,12 +294,12 @@ void loop() {
             break;
         case STATE_LOGIN:
             f_state_login();
-          
+            break;
         case STATE_RUNNING:
             f_state_running();
             break;
         case STATE_ERROR:
-            break;  break;
+            break;
         case STATE_CONFIG:
             break;
     }
