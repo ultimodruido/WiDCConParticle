@@ -126,13 +126,13 @@ boolean f_check_cmd_id(String* msg, String* cmd) {
 	  //f_log(cmd);
 	  //f_log(id);
 	  String dev_id = msg->substring(msg->indexOf("|")+1, msg->indexOf("#"));
-	  cmd->concat( msg->substring(0, msg->indexOf("|")) );
+	  cmd->concat(msg->substring(0, msg->indexOf("|")));
 	  //System.deviceID();
 	  //how to compare char* & string?
 
 	  //dev_id.toCharArray(sys_id, 32);
 	  //f_log(sys_id);
-	  if (!strncmp(id, sys_id, 32)) {
+	  if (cmd->compareTo(System.deviceID()) == 0) {
 	  	    return true;
 	  }
 	  else {
@@ -226,7 +226,7 @@ void f_send_alive() {
 
         while (widcc_client.connected()) {
             if (widcc_client.available()) {
-                widcc_reply.concat(String::format("%c", client.read()));
+                widcc_reply.concat(String::format("%c", widcc_client.read()));
                 //char c;
                 //c = widcc_client.read();
                 //strncat(widcc_reply, (char*)widcc_client.read(), 1);
@@ -245,24 +245,24 @@ void f_send_alive() {
            	 //RGB.color(255, 0, 255);
             // Todo switch
             //if ( !strncmp(cmd, "OK", 2) ) {
-            if (command.compareTo("OK") == 0) {
+            if (cmd.compareTo("OK") == 0) {
                 RGB.color(0, 255, 0);
             }
-            else if ( !strncmp(cmd, "COMMAND", 7)) {
+            else if ( cmd.compareTo("COMMAND") == 0) {
                 //RGB.color(0, 0, 255);
                 //char widcc_reply[64];
                 //reply.toCharArray(widcc_reply, 64);
                 //f_read_msg_command( widcc_reply );
             }
-            else if ( !strncmp(cmd, "UPDATE", 6)) {
+            else if ( cmd.compareTo("UPDATE") == 0) {
             }
-            else if ( !strncmp(cmd, "EMERGENCY", 9)) {
+            else if ( cmd.compareTo("EMERGENCY") == 0) {
                 RGB.color(255, 0, 0);
             }
-            else if ( !strncmp(cmd, "IDENTIFY", 8)) {
+            else if ( cmd.compareTo("IDENTIFY") == 0)  {
                 RGB.color(255, 255, 0);
             }
-            else if ( !strncmp(cmd, "CONFIG", 6)) {
+            else if ( cmd.compareTo("CONFIG") == 0) {
                 RGB.color(0, 255, 255);
             }
 
