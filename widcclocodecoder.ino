@@ -80,7 +80,6 @@ void f_msg_alive(String* msg) {
                                         my_loco.loco_real_speed, my_loco.loco_target_speed, my_loco.direction, \
                                         my_loco.light_auto, my_loco.light_front, my_loco.light_rear, \
                                         my_loco.F1, my_loco.F2, my_loco.F3, my_loco.F4));
-    msg_string.toCharArray(msg_char, 64);
 }
 
 boolean f_make_bool(int val) {
@@ -171,7 +170,7 @@ void f_state_login() {
             // prepare a login message and se
             String widcc_login_msg = "";
             f_msg_login(&widcc_login_msg);
-            widcc_client.println( &widcc_login_msg );
+            widcc_client.println( widcc_login_msg );
 
             String reply = "";
             // loop to get the reply
@@ -222,7 +221,7 @@ void f_send_alive() {
     if (widcc_client.connect(server, port)) {
         String widcc_message = "";
         f_msg_alive( &widcc_message );
-        widcc_client.println( &widcc_message );
+        widcc_client.println( widcc_message );
 
         String widcc_reply = "";
 
