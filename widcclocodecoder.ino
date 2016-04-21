@@ -89,43 +89,43 @@ boolean f_make_bool(int val) {
 
 void f_read_msg_command(String* msg) {
     // Get main message splitters
-    int split_1 = msg_str.indexOf("#");
-    int split_2 = msg_str.indexOf("#", split_1+1);
-    int split_3 = msg_str.indexOf("#", split_2+1);
-    
+    int split_1 = msg->indexOf("#");
+    int split_2 = msg->indexOf("#", split_1+1);
+    int split_3 = msg->indexOf("#", split_2+1);
+
     // Find motor driver command (target_speed|direction)
     String msg_part = msg->substring(split_1+1, split_2);
     int divider_1 = msg_part.indexOf("|");
-    
+
     String instruction = msg_part.substring(0, divider_1 );
     widcc_command.loco_target_speed = instruction.toInt();
-    instruction.clear();
-    
-    instruction = msg_part.substring( divider_2+1, msg_part.length());
+    //instruction.clear();
+
+    instruction = msg_part.substring( divider_1+1, msg_part.length());
     widcc_command.direction = f_make_bool(instruction.toInt());
-    instruction.clear();
-    
+    //instruction.clear();
+
     // Find loco's lights command (auto|front|rear)
-    msg_part.clear();
+    //msg_part.clear();
     msg_part = msg->substring(split_2+1, split_3);
     divider_1 = msg_part.indexOf("|");
-    divider_2 = msg_part.indexOf("|", divider_1+1 );
-    
+    int divider_2 = msg_part.indexOf("|", divider_1+1 );
+
     instruction = msg_part.substring(0, divider_1 );
     widcc_command.light_auto = f_make_bool( instruction.toInt());
-    instruction.clear();
-    
+    //instruction.clear();
+
     instruction = msg_part.substring(divider_1+1, divider_2);
     widcc_command.light_front = f_make_bool( instruction.toInt());
-    instruction.clear();
-    
+    //instruction.clear();
+
     instruction = msg_part.substring(divider_2+1, msg_part.length() );
     widcc_command.light_rear = f_make_bool( instruction.toInt());
-    instruction.clear();
-    
+    //instruction.clear();
+
     instruction = msg_part.substring( divider_2+1, msg_part.length());
     widcc_command.direction = f_make_bool(instruction.toInt());
-    instruction.clear();
+    //instruction.clear();
 
     // extra functions F1-F4 not implemented yet
 }
@@ -135,7 +135,7 @@ boolean f_check_cmd_id(String* msg, String* cmd) {
 	  String id = msg->substring(msg_div+1, msg->indexOf("#"));
 	  cmd->concat(msg->substring(0, msg_div));
 
-	  if (id->compareTo(System.deviceID()) == 0) {
+	  if (id.compareTo(System.deviceID()) == 0) {
 	  	    return true;
 	  }
 	  else {
