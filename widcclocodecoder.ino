@@ -87,52 +87,55 @@ boolean f_make_bool(int val) {
 	  return (1 && val );
 }
 
-/*void f_read_msg_command(char* msg_char) {
-    // update my_loco here
-    //RGB.color(0, 0, 255);
+void f_read_msg_command(String* msg) {
     // Get main message splitters
-    String msg_str = String::format("%s", msg_char);
     int split_1 = msg_str.indexOf("#");
     int split_2 = msg_str.indexOf("#", split_1+1);
-    int split_3 = msg_str.indexOf("#", split_1+2);
-    // Find driver command
-    int subsplit = msg_str.indexOf("|", split_1+1);
-    String cmd = msg_str.substring(split_1+1, subsplit);
-    widcc_command.loco_target_speed = cmd.toInt();
-    cmd = msg_str.substring(subsplit + 1, split_2);
-    widcc_command.direction = f_make_bool(cmd.toInt());
-    // Find lights instructions
-    // light auto
-    subsplit = msg_str.indexOf("|", split_2+1);
-    cmd = msg_str.substring(split_2+1, subsplit );
-    widcc_command.light_auto = f_make_bool(cmd.toInt());
-    // light front
-    int subsplit2 = msg_str.indexOf("|", subsplit+1);
-    cmd = msg_str.substring(subsplit + 1, subsplit2);
-    widcc_command.light_front = f_make_bool(cmd.toInt());
-    // light rear
-    cmd = msg_str.substring(subsplit2+1, split_3);
-    widcc_command.light_rear = f_make_bool(cmd.toInt());
+    int split_3 = msg_str.indexOf("#", split_2+1);
+    
+    // Find motor driver command (target_speed|direction)
+    String msg_part = msg->substring(split_1+1, split_2);
+    int divider_1 = msg_part.indexOf("|");
+    
+    String instruction = msg_part.substring(0, divider_1 );
+    widcc_command.loco_target_speed = instruction.toInt();
+    instruction.clear();
+    
+    instruction = msg_part.substring( divider_2+1, msg_part.length());
+    widcc_command.direction = f_make_bool(instruction.toInt());
+    instruction.clear();
+    
+    // Find loco's lights command (auto|front|rear)
+    msg_part.clear();
+    msg_part = msg->substring(split_2+1, split_3);
+    divider_1 = msg_part.indexOf("|");
+    divider_2 = msg_part.indexOf("|", divider_1+1 );
+    
+    instruction = msg_part.substring(0, divider_1 );
+    widcc_command.light_auto = f_make_bool( instruction.toInt());
+    instruction.clear();
+    
+    instruction = msg_part.substring(divider_1+1, divider_2);
+    widcc_command.light_front = f_make_bool( instruction.toInt());
+    instruction.clear();
+    
+    instruction = msg_part.substring(divider_2+1, msg_part.length() );
+    widcc_command.light_rear = f_make_bool( instruction.toInt());
+    instruction.clear();
+    
+    instruction = msg_part.substring( divider_2+1, msg_part.length());
+    widcc_command.direction = f_make_bool(instruction.toInt());
+    instruction.clear();
 
-    // extra functions F1-F4 not implemented
-}*/
+    // extra functions F1-F4 not implemented yet
+}
 
 boolean f_check_cmd_id(String* msg, String* cmd) {
-	  //char sys_id[32];
-	  //snprintf(sys_id, 32, "CHECK");
-	  //f_log(sys_id);
-	  //f_log(msg);
-	  //sscanf(msg,"%s|%s#%*s", cmd, id);
-	  //f_log(cmd);
-	  //f_log(id);
-	  String dev_id = msg->substring(msg->indexOf("|")+1, msg->indexOf("#"));
-	  cmd->concat(msg->substring(0, msg->indexOf("|")));
-	  //System.deviceID();
-	  //how to compare char* & string?
+	  int msg_div = msg->indexOf("|");
+	  String id = msg->substring(msg_div+1, msg->indexOf("#"));
+	  cmd->concat(msg->substring(0, msg_div));
 
-	  //dev_id.toCharArray(sys_id, 32);
-	  //f_log(sys_id);
-	  if (cmd->compareTo(System.deviceID()) == 0) {
+	  if (id->compareTo(System.deviceID()) == 0) {
 	  	    return true;
 	  }
 	  else {
@@ -181,7 +184,7 @@ void f_state_login() {
 
             // read t TODOhe reply
 
-            if (reply.indexOf("OK") != -1) {
+            if (reply.indexOf("OK") == 0) {
     	           // in case of successful login, activate
     	           // the alive timer which regularly
     	           // contacts the server
@@ -191,7 +194,7 @@ void f_state_login() {
         }
     }
     else {
- 	    // if tye connecton get lost, move bac to Init  else {
+ 	      // if type connecton get lost, move bac to Init
         my_state = STATE_INIT;
     }
 
@@ -222,41 +225,32 @@ void f_send_alive() {
         widcc_client.println( widcc_message );
 
         String widcc_reply = "";
-        //char widcc_reply[64];
 
         while (widcc_client.connected()) {
             if (widcc_client.available()) {
                 widcc_reply.concat(String::format("%c", widcc_client.read()));
-                //char c;
-                //c = widcc_client.read();
-                //strncat(widcc_reply, (char*)widcc_client.read(), 1);
             }
         }
         widcc_client.stop();
 
-        //strncat(widcc_reply, , 1);
-
-        String cmd;
-        //String id[32];
-
+        String cmd = "";
 
         if ( f_check_cmd_id(&widcc_reply, &cmd)) {
-        	   //char command[16] = f_check_command(&reply);
-           	 //RGB.color(255, 0, 255);
-            // Todo switch
-            //if ( !strncmp(cmd, "OK", 2) ) {
+            // Switch to identify the command
             if (cmd.compareTo("OK") == 0) {
+            	   // display LED GREEN
                 RGB.color(0, 255, 0);
             }
             else if ( cmd.compareTo("COMMAND") == 0) {
-                //RGB.color(0, 0, 255);
-                //char widcc_reply[64];
-                //reply.toCharArray(widcc_reply, 64);
-                //f_read_msg_command( widcc_reply );
+            	   // display LED BLUE
+                RGB.color(0, 0, 255);
+                // execute interpreter function
+                f_read_msg_command( &widcc_reply );
             }
             else if ( cmd.compareTo("UPDATE") == 0) {
             }
             else if ( cmd.compareTo("EMERGENCY") == 0) {
+            	   // display LED RED
                 RGB.color(255, 0, 0);
             }
             else if ( cmd.compareTo("IDENTIFY") == 0)  {
