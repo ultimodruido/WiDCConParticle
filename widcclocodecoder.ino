@@ -98,33 +98,23 @@ void f_read_msg_command(String* msg) {
 
     String instruction = msg_part.substring(0, divider_1 );
     widcc_command.loco_target_speed = instruction.toInt();
-    //instruction.clear();
 
     instruction = msg_part.substring( divider_1+1, msg_part.length());
     widcc_command.direction = f_make_bool(instruction.toInt());
-    //instruction.clear();
 
     // Find loco's lights command (auto|front|rear)
-    //msg_part.clear();
     msg_part = msg->substring(split_2+1, split_3);
     divider_1 = msg_part.indexOf("|");
     int divider_2 = msg_part.indexOf("|", divider_1+1 );
 
     instruction = msg_part.substring(0, divider_1 );
     widcc_command.light_auto = f_make_bool( instruction.toInt());
-    //instruction.clear();
 
     instruction = msg_part.substring(divider_1+1, divider_2);
     widcc_command.light_front = f_make_bool( instruction.toInt());
-    //instruction.clear();
 
     instruction = msg_part.substring(divider_2+1, msg_part.length() );
     widcc_command.light_rear = f_make_bool( instruction.toInt());
-    //instruction.clear();
-
-    instruction = msg_part.substring( divider_2+1, msg_part.length());
-    widcc_command.direction = f_make_bool(instruction.toInt());
-    //instruction.clear();
 
     // extra functions F1-F4 not implemented yet
 }
@@ -168,22 +158,24 @@ void f_state_login() {
             //char log_msg2[] = "TCP connected";
             //f_log(log_msg2);
             // prepare a login message and se
-            String widcc_login_msg = "";
-            f_msg_login(&widcc_login_msg);
-            widcc_client.println( widcc_login_msg );
+            String widcc_msg = "";
+            f_msg_login(&widcc_msg);
+            widcc_client.println( widcc_msg );
 
-            String reply = "";
+            // clear the string to reuse memory
+            // a receive the server reply
+            widcc_msg = "";
             // loop to get the reply
             while (widcc_client.connected()) {
                 if (widcc_client.available()) {
-                    reply.concat(String::format("%c", widcc_client.read()));
+                    widcc_msg.concat(String::format("%c", widcc_client.read()));
                 }
             }
             widcc_client.stop();
 
             // read t TODOhe reply
 
-            if (reply.indexOf("OK") == 0) {
+            if (widcc_msg.compareTo("OK") == 0) {
     	           // in case of successful login, activate
     	           // the alive timer which regularly
     	           // contacts the server
@@ -205,12 +197,10 @@ void f_state_running() {
     if (!WiFi.ready()) {
         my_state = STATE_INIT;
         alive_timer.stop();
-//        RGB.color(0, 255, 255);
-//        delay(1500);
     }
     else {
-        //RGB.color(255, 255, 0);
-        delay(1500);
+        //update the loco parameters
+        //delay(1500);
     }
     //TODO in RUNNING update the real loco
 }
@@ -219,22 +209,23 @@ void f_send_alive() {
     char log_msg[] = "ALIVE";
     f_log(log_msg);
     if (widcc_client.connect(server, port)) {
-        String widcc_message = "";
-        f_msg_alive( &widcc_message );
-        widcc_client.println( widcc_message );
+        String widcc_msg = "";
+        f_msg_alive( &widcc_msg );
+        widcc_client.println( widcc_msg );
 
-        String widcc_reply = "";
+        //reuse the String to get the reply
+        widcc_msg = "";
 
         while (widcc_client.connected()) {
             if (widcc_client.available()) {
-                widcc_reply.concat(String::format("%c", widcc_client.read()));
+                widcc_msg.concat(String::format("%c", widcc_client.read()));
             }
         }
         widcc_client.stop();
 
         String cmd = "";
 
-        if ( f_check_cmd_id(&widcc_reply, &cmd)) {
+        if ( f_check_cmd_id(&widcc_msg, &cmd)) {
             // Switch to identify the command
             if (cmd.compareTo("OK") == 0) {
             	   // display LED GREEN
@@ -247,6 +238,8 @@ void f_send_alive() {
                 f_read_msg_command( &widcc_reply );
             }
             else if ( cmd.compareTo("UPDATE") == 0) {
+            	   // display LED WHITE
+            	   RGB.color(255, 255, 255);
             }
             else if ( cmd.compareTo("EMERGENCY") == 0) {
             	   // display LED RED
