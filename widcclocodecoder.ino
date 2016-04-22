@@ -21,9 +21,8 @@ int port = 7246;
 
 struct LocoDescriptor {
 
-    //char loco_id[32] = "";
-    int loco_real_speed = 0;
-    int loco_target_speed = 0;
+    int real_speed = 0;
+    int target_speed = 0;
     boolean direction = true;
     boolean light_auto = true;
     boolean light_front = false;
@@ -37,7 +36,7 @@ struct LocoDescriptor {
 // real loco values
 LocoDescriptor my_loco;
 // memory space for inputs received
-LocoDescriptor widcc_command;
+LocoDescriptor my_loco_buffer;
 
 void f_send_alive();
 Timer alive_timer(3000, f_send_alive);
@@ -70,7 +69,7 @@ void f_msg_login(String* msg) {
     msg->concat("LOGIN|");
     msg->concat(System.deviceID());
     msg->concat(String::format("#%s#", WiDCCProtocolVersion));
-    //msg_.toCharArray(msg_char, 64);
+    
 }
 
 void f_msg_alive(String* msg) {
@@ -97,10 +96,10 @@ void f_read_msg_command(String* msg) {
     int divider_1 = msg_part.indexOf("|");
 
     String instruction = msg_part.substring(0, divider_1 );
-    widcc_command.loco_target_speed = instruction.toInt();
+    my_loco_buffer.target_speed = instruction.toInt();
 
     instruction = msg_part.substring( divider_1+1, msg_part.length());
-    widcc_command.direction = f_make_bool(instruction.toInt());
+    my_loco_buffer.direction = f_make_bool(instruction.toInt());
 
     // Find loco's lights command (auto|front|rear)
     msg_part = msg->substring(split_2+1, split_3);
@@ -108,13 +107,13 @@ void f_read_msg_command(String* msg) {
     int divider_2 = msg_part.indexOf("|", divider_1+1 );
 
     instruction = msg_part.substring(0, divider_1 );
-    widcc_command.light_auto = f_make_bool( instruction.toInt());
+    my_loco_buffer.light_auto = f_make_bool( instruction.toInt());
 
     instruction = msg_part.substring(divider_1+1, divider_2);
-    widcc_command.light_front = f_make_bool( instruction.toInt());
+    my_loco_buffer.light_front = f_make_bool( instruction.toInt());
 
     instruction = msg_part.substring(divider_2+1, msg_part.length() );
-    widcc_command.light_rear = f_make_bool( instruction.toInt());
+    my_loco_buffer.light_rear = f_make_bool( instruction.toInt());
 
     // extra functions F1-F4 not implemented yet
 }
@@ -198,11 +197,19 @@ void f_state_running() {
         my_state = STATE_INIT;
         alive_timer.stop();
     }
-    else {
-        //update the loco parameters
-        //delay(1500);
-    }
-    //TODO in RUNNING update the real loco
+    //update the loco parameters
+    my_loco.target_speed = my_loco_buffer.target_speed;
+    my_loco.direction = my_loco_buffer.target_speed;
+    
+    my_loco.light_auto = my_loco_buffer.light_auto;
+    my_loco.light_front = my_loco_buffer.light_front;
+    my_loco.light_rear = my_loco_buffer.light_rear;
+    
+    my_loco.F1 = my_loco_buffer.F1;
+    my_loco.F2 = my_loco_buffer.F2;
+    my_loco.F3 = my_loco_buffer.F3;
+    my_loco.F4 = my_loco_buffer.F4;
+    
 }
 
 void f_send_alive() {
