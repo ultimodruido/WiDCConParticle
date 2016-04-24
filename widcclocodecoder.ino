@@ -49,11 +49,11 @@ boolean LOGGING = true;
 TCPClient log_client;
 int log_port = 7247;
 
-void f_log(char* msg) {
+void f_log(String* msg) {
 
     if ( LOGGING ) {
         if (log_client.connect(server, log_port)) {
-            log_client.println( msg );
+            log_client.println( *msg );
         }
         log_client.stop();
     }
@@ -65,18 +65,26 @@ void f_log(char* msg) {
  ***************/
 char WiDCCProtocolVersion[8] = "0.1.0";
 
+void f_tcp_receive_msg(TCPClient* widcc_client, String* widcc_reply) {
+    while (widcc_client->connected()) {
+        if (widcc_client->available()) {
+            widcc_reply->concat(String::format("%c", widcc_client->read()));
+        }
+    }
+}
+
 void f_msg_login(String* msg) {
     msg->concat("LOGIN|");
     msg->concat(System.deviceID());
     msg->concat(String::format("#%s#", WiDCCProtocolVersion));
-    
+
 }
 
 void f_msg_alive(String* msg) {
     msg->concat("ALIVE|");
     msg->concat(System.deviceID());
     msg->concat( String::format("#%u|%u|%u#%u|%u|%u#%u|%u|%u|%u#", \
-                                        my_loco.loco_real_speed, my_loco.loco_target_speed, my_loco.direction, \
+                                        my_loco.real_speed, my_loco.target_speed, my_loco.direction, \
                                         my_loco.light_auto, my_loco.light_front, my_loco.light_rear, \
                                         my_loco.F1, my_loco.F2, my_loco.F3, my_loco.F4));
 }
@@ -138,8 +146,8 @@ boolean f_check_cmd_id(String* msg, String* cmd) {
 void f_state_init() {
     // wait for wifi to be ready
     //digitalWrite(LED, HIGH);
-    char log_msg[] = "STATUS INIT";
-    f_log(log_msg);
+    String msg = "STATUS INIT 4";
+    f_log(&msg);
     if (WiFi.ready()) {
     	    my_state = STATE_LOGIN;
     }
@@ -149,38 +157,43 @@ void f_state_init() {
 }
 
 void f_state_login() {
-    char log_msg[] = "STATUS LOGIN";
-    f_log(log_msg);
+    String msg = "STATUS LOGIN";
+    f_log(&msg);
     if (WiFi.ready()) {
         // open TCP client and connect
         if (widcc_client.connect(server, port)) {
             //char log_msg2[] = "TCP connected";
             //f_log(log_msg2);
             // prepare a login message and se
-            String widcc_msg = "";
-            f_msg_login(&widcc_msg);
-            widcc_client.println( widcc_msg );
+            String* widcc_msg = new String("");
+            f_msg_login(widcc_msg);
+            widcc_client.println( *widcc_msg );
+            f_log(widcc_msg);
 
-            // clear the string to reuse memory
-            // a receive the server reply
-            widcc_msg = "";
+            // clear the string to free memory
+            delete widcc_msg;
+
+            String* widcc_reply = new String("");
             // loop to get the reply
-            while (widcc_client.connected()) {
+            f_tcp_receive_msg(&widcc_client, widcc_reply);
+            /*while (widcc_client.connected()) {
                 if (widcc_client.available()) {
-                    widcc_msg.concat(String::format("%c", widcc_client.read()));
+                    widcc_reply->concat(String::format("%c", widcc_client.read()));
                 }
-            }
+                //f_log(widcc_reply);
+            }*/
             widcc_client.stop();
 
-            // read t TODOhe reply
+            f_log(widcc_reply);
 
-            if (widcc_msg.compareTo("OK") == 0) {
+            if (widcc_reply->indexOf("LOGINOK") == 0) {
     	           // in case of successful login, activate
     	           // the alive timer which regularly
     	           // contacts the server
                    alive_timer.start();
                    my_state = STATE_RUNNING;
             }
+
         }
     }
     else {
@@ -191,8 +204,8 @@ void f_state_login() {
 }
 
 void f_state_running() {
-    char log_msg[] = "STATUS RUNNING";
-    f_log(log_msg);
+    String msg = "STATUS RUNNING";
+    f_log(&msg);
     if (!WiFi.ready()) {
         my_state = STATE_INIT;
         alive_timer.stop();
@@ -200,70 +213,75 @@ void f_state_running() {
     //update the loco parameters
     my_loco.target_speed = my_loco_buffer.target_speed;
     my_loco.direction = my_loco_buffer.target_speed;
-    
+
     my_loco.light_auto = my_loco_buffer.light_auto;
     my_loco.light_front = my_loco_buffer.light_front;
     my_loco.light_rear = my_loco_buffer.light_rear;
-    
+
     my_loco.F1 = my_loco_buffer.F1;
     my_loco.F2 = my_loco_buffer.F2;
     my_loco.F3 = my_loco_buffer.F3;
     my_loco.F4 = my_loco_buffer.F4;
-    
+
+    delay(100);
 }
 
 void f_send_alive() {
-    char log_msg[] = "ALIVE";
-    f_log(log_msg);
+    String msg = "ALIVE";
+    f_log(&msg);
     if (widcc_client.connect(server, port)) {
-        String widcc_msg = "";
-        f_msg_alive( &widcc_msg );
-        widcc_client.println( widcc_msg );
+        String* widcc_msg = new String("");
+        f_msg_alive( widcc_msg );
+        widcc_client.println( *widcc_msg );
 
         //reuse the String to get the reply
-        widcc_msg = "";
+        delete widcc_msg;
 
-        while (widcc_client.connected()) {
+        String* widcc_reply = new String("");
+
+        f_tcp_receive_msg(&widcc_client, widcc_reply);
+        /*while (widcc_client.connected()) {
             if (widcc_client.available()) {
-                widcc_msg.concat(String::format("%c", widcc_client.read()));
+                widcc_reply->concat(String::format("%c", widcc_client.read()));
             }
-        }
+        }*/
         widcc_client.stop();
 
-        String cmd = "";
+        f_log(widcc_reply);
+        String* cmd = new String("");
 
-        if ( f_check_cmd_id(&widcc_msg, &cmd)) {
+        if ( f_check_cmd_id(widcc_reply, cmd)) {
             // Switch to identify the command
-            if (cmd.compareTo("OK") == 0) {
+            if (cmd->compareTo("OK") == 0) {
             	   // display LED GREEN
                 RGB.color(0, 255, 0);
             }
-            else if ( cmd.compareTo("COMMAND") == 0) {
+            else if ( cmd->compareTo("COMMAND") == 0) {
             	   // display LED BLUE
                 RGB.color(0, 0, 255);
                 // execute interpreter function
-                f_read_msg_command( &widcc_reply );
+                //f_read_msg_command( widcc_reply );
             }
-            else if ( cmd.compareTo("UPDATE") == 0) {
+            else if ( cmd->compareTo("UPDATE") == 0) {
             	   // display LED WHITE
             	   RGB.color(255, 255, 255);
             }
-            else if ( cmd.compareTo("EMERGENCY") == 0) {
+            else if ( cmd->compareTo("EMERGENCY") == 0) {
             	   // display LED RED
                 RGB.color(255, 0, 0);
             }
-            else if ( cmd.compareTo("IDENTIFY") == 0)  {
+            else if ( cmd->compareTo("IDENTIFY") == 0)  {
                 RGB.color(255, 255, 0);
             }
-            else if ( cmd.compareTo("CONFIG") == 0) {
+            else if ( cmd->compareTo("CONFIG") == 0) {
                 RGB.color(0, 255, 255);
             }
 
         }
         else {
             // Log wrong device id
-            char msg[] = "Message received with wrong device id";
-            f_log(msg);
+            String msg = "Message received with wrong device id";
+            f_log(&msg);
         }
     }
 }
