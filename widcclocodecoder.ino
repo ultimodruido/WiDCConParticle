@@ -38,18 +38,19 @@ LocoDescriptor my_loco;
 
 struct WiDCCInstruction {
   boolean updated = false;
-  LocoDescriptor loco;
+  LocoDescriptor* loco = new LocoDescriptor;
 };
+
 // memory space for inputs received
 WiDCCInstruction my_loco_buffer;
 
 void f_send_alive();
-Timer alive_timer(3000, f_send_alive);
+Timer alive_timer(5000, f_send_alive);
 
 /****************
  * Logging
  ***************/
-boolean LOGGING = false;
+boolean LOGGING = true;
 
 TCPClient log_client;
 int log_port = 7247;
@@ -160,9 +161,11 @@ void f_state_init() {
     if (WiFi.ready()) {
     	    //my_state = STATE_LOGIN;
           my_state = STATE_RUNNING;
+          delay(500);
+          alive_timer.start();
     }
     else {
-    	    delay(1000);
+    	    delay(2000);
     }
 }
 /*
@@ -215,26 +218,29 @@ void f_state_running() {
     my_state = STATE_INIT;
     alive_timer.stop();
   }
+  else {
+    if (my_loco_buffer.updated) {
+      //update the loco parameters
+      String msg2 = "STATUS RUNNING - update";
+      f_log(&msg2);
+      /*my_loco.target_speed = my_loco_buffer.loco.target_speed;
+      my_loco.direction = my_loco_buffer.loco.target_speed;
 
-  if (my_loco_buffer.updated) {
-    //update the loco parameters
-    my_loco.target_speed = my_loco_buffer.loco.target_speed;
-    my_loco.direction = my_loco_buffer.loco.target_speed;
+      my_loco.light_auto = my_loco_buffer.loco.light_auto;
+      my_loco.light_front = my_loco_buffer.loco.light_front;
+      my_loco.light_rear = my_loco_buffer.loco.light_rear;
 
-    my_loco.light_auto = my_loco_buffer.loco.light_auto;
-    my_loco.light_front = my_loco_buffer.loco.light_front;
-    my_loco.light_rear = my_loco_buffer.loco.light_rear;
+      my_loco.F1 = my_loco_buffer.loco.F1;
+      my_loco.F2 = my_loco_buffer.loco.F2;
+      my_loco.F3 = my_loco_buffer.loco.F3;
+      my_loco.F4 = my_loco_buffer.loco.F4;
+      */
 
-    my_loco.F1 = my_loco_buffer.loco.F1;
-    my_loco.F2 = my_loco_buffer.loco.F2;
-    my_loco.F3 = my_loco_buffer.loco.F3;
-    my_loco.F4 = my_loco_buffer.loco.F4;
-
-    //clear updated flag
-    my_loco_buffer.updated = false;
+      //clear updated flag
+      my_loco_buffer.updated = false;
+    }
   }
-
-  delay(10);
+  delay(50);
 }
 
 void f_send_alive() {
