@@ -37,15 +37,24 @@ struct LocoDescriptor {
 LocoDescriptor my_loco;
 
 struct WiDCCInstruction {
-  boolean updated = false;
+  boolean modified = false;
   LocoDescriptor* loco = new LocoDescriptor;
 };
 
 // memory space for inputs received
 WiDCCInstruction my_loco_buffer;
 
+struct Markers {
+	int counter_runs = 0;
+	int counter_alive = 0
+}
+
+Markers flags;
+
 void f_send_alive();
-Timer alive_timer(5000, f_send_alive);
+const int ALIVE_INTERVAL 500;
+const int ALIVE_ERROR_REPLYES 4; // means 2 seconds
+Timer alive_timer( ALIVE_INTERVAL , f_send_alive);
 
 /****************
  * Logging
@@ -78,13 +87,6 @@ void f_tcp_receive_msg(TCPClient* widcc_client, String* widcc_reply) {
         }
     }
 }
-
-/*void f_msg_login(String* msg) {
-    msg->concat("LOGIN|");
-    msg->concat(System.deviceID());
-    msg->concat(String::format("#%s#", WiDCCProtocolVersion));
-
-}*/
 
 void f_msg_alive(String* msg) {
     msg->concat("ALIVE|");
@@ -133,7 +135,7 @@ void f_read_msg_command(String* msg) {
     // TODO
 
     // set updated flag
-    my_loco_buffer.updated = true;
+    my_loco_buffer.modified = true;
 }
 
 boolean f_check_cmd_id(String* msg, String* cmd) {
@@ -168,57 +170,19 @@ void f_state_init() {
     	    delay(2000);
     }
 }
-/*
-void f_state_login() {
-    String msg = "STATUS LOGIN";
-    f_log(&msg);
-    if (WiFi.ready()) {
-        // open TCP client and connect
-        if (widcc_client.connect(server, port)) {
-            //char log_msg2[] = "TCP connected";
-            //f_log(log_msg2);
-            // prepare a login message and se
-            String* widcc_msg = new String("");
-            f_msg_login(widcc_msg);
-            widcc_client.println( *widcc_msg );
-            f_log(widcc_msg);
-
-            // clear the string to free memory
-            delete widcc_msg;
-
-            String* widcc_reply = new String("");
-            // loop to get the reply
-            f_tcp_receive_msg(&widcc_client, widcc_reply);
-
-            widcc_client.stop();
-
-            f_log(widcc_reply);
-
-            if (widcc_reply->indexOf("LOGINOK") == 0) {
-    	           // in case of successful login, activate
-    	           // the alive timer which regularly
-    	           // contacts the server
-                   alive_timer.start();
-                   my_state = STATE_RUNNING;
-            }
-
-        }
-    }
-    else {
- 	      // if type connecton get lost, move bac to Init
-        my_state = STATE_INIT;
-    }
-
-}*/
 
 void f_state_running() {
   String msg = "STATUS RUNNING";
   f_log(&msg);
-  if (!WiFi.ready()) {
+  
+  //update flags
+  flags.counter_runs++;
+  
+ /*if (!WiFi.ready()) {
     my_state = STATE_INIT;
     alive_timer.stop();
   }
-  else {
+  else {*/
     if (my_loco_buffer.updated) {
       //update the loco parameters
       String msg2 = "STATUS RUNNING - update";
@@ -239,34 +203,52 @@ void f_state_running() {
       //clear updated flag
       my_loco_buffer.updated = false;
     }
-  }
+  //}
   delay(50);
 }
 
 void f_send_alive() {
-  String msg = "ALIVE";
-  f_log(&msg);
-  if (widcc_client.connect(server, port)) {
-    String* widcc_msg = new String("");
-    f_msg_alive( widcc_msg );
-    widcc_client.println( *widcc_msg );
+  //String msg = "ALIVE";
+  //f_log(&msg);
+  if (flags.counter_runs == 0) {
+  		String warning = "NO RUNS!!!";
+  		f_log(&warnings);
+  }
+  // reset flag runs
+  flag.counter_runs = 0;
+  
+  if (flags.counter_alive >= ALIVE_ERROR_REPLIES ) {
+  		 my_state = STATE_ERROR;
+  }
+  // update alive flag
+  flags.counter_alive++;
+  
+  if (!WiFi.ready()) {
+    if (widcc_client.connect(server, port)) {
+      String* widcc_msg = new String("");
+      f_msg_alive( widcc_msg );
+      widcc_client.println( *widcc_msg );
 
-   //reuse the String to get the reply
-    delete widcc_msg;
+     //free the String mmory
+      delete widcc_msg;
 
-    String* widcc_reply = new String("");
+      String* widcc_reply = new String("");
 
-    f_tcp_receive_msg(&widcc_client, widcc_reply);
-    widcc_client.stop();
+      f_tcp_receive_msg(&widcc_client, widcc_reply);
+      widcc_client.stop();
 
-    f_log(widcc_reply);
-    String* cmd = new String("");
+      f_log(widcc_reply);
+      String* cmd = new String("");
 
-    if ( f_check_cmd_id(widcc_reply, cmd)) {
-      // Switch to identify the command
-      if (cmd->compareTo("OK") == 0) {
-        // display LED GREEN
-        RGB.color(0, 255, 0);
+      if ( f_check_cmd_id(widcc_reply, cmd)) {
+    	
+      	  // message received - update alive flag
+    			flags.counter_alive = 0;
+   			
+       // Switch to identify the command
+        if (cmd->compareTo("OK") == 0) {
+          // display LED GREEN
+          RGB.color(0, 255, 0);
       }
       else if ( cmd->compareTo("COMMAND") == 0) {
         // display LED BLUE
@@ -288,11 +270,14 @@ void f_send_alive() {
       else if ( cmd->compareTo("CONFIG") == 0) {
         RGB.color(0, 255, 255);
       }
-    }
-    else {
-      // Log wrong device id
-      String msg = "Message received with wrong device id";
-      f_log(&msg);
+      
+      
+      }
+      else {
+        // Log wrong device id
+        String msg = "Message received with wrong device id";
+        f_log(&msg);
+      }
     }
   }
 }
