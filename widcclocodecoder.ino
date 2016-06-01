@@ -62,16 +62,20 @@ Timer alive_timer( ALIVE_INTERVAL , f_send_alive);
 ***************/
 boolean LOGGING = true;
 
-TCPClient log_client;
-int log_port = 7247;
+//TCPClient log_client;
+//int log_port = 7247;
+
+
 
 void f_log(String* msg) {
 
   if ( LOGGING ) {
-    if (log_client.connect(server, log_port)) {
+    /*if (log_client.connect(server, log_port)) {
       log_client.println( *msg );
     }
-    log_client.stop();
+    log_client.stop(); */
+    Serial.println("Hello");
+    //Serial.write(*msg);
   }
 }
 
@@ -157,6 +161,11 @@ boolean f_check_cmd_id(String* msg, String* cmd) {
 ***************/
 
 void f_state_init() {
+
+  if (LOGGING) {
+    Serial.begin(9600);
+  }
+
   // wait for wifi to be ready
   //digitalWrite(LED, HIGH);
   String msg = "STATUS INIT 6";
@@ -164,6 +173,8 @@ void f_state_init() {
 
   delay(500);
   alive_timer.start();
+
+
 
   my_state = STATE_RUNNING;
   /*if (WiFi.ready()) {
