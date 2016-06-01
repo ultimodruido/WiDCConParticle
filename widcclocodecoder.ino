@@ -62,20 +62,10 @@ Timer alive_timer( ALIVE_INTERVAL , f_send_alive);
 ***************/
 boolean LOGGING = true;
 
-//TCPClient log_client;
-//int log_port = 7247;
-
-
-
 void f_log(String* msg) {
 
   if ( LOGGING ) {
-    /*if (log_client.connect(server, log_port)) {
-      log_client.println( *msg );
-    }
-    log_client.stop(); */
     Serial.println(*msg);
-    //Serial.write(*msg);
   }
 }
 
