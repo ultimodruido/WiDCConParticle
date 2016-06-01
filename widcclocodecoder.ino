@@ -74,7 +74,7 @@ void f_log(String* msg) {
       log_client.println( *msg );
     }
     log_client.stop(); */
-    Serial.println("Hello");
+    Serial.println(*msg);
     //Serial.write(*msg);
   }
 }
