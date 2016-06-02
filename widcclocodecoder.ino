@@ -6,9 +6,9 @@ int LED = D7;
 
 enum States {
   STATE_INIT,
-  STATE_LOGIN,
+  STATE_TURN_ON,
   STATE_RUNNING,
-  STATE_CONFIG,
+  //STATE_CONFIG,
   STATE_ERROR
 };
 
@@ -31,25 +31,24 @@ struct LocoDescriptor {
   boolean F2 = false;
   boolean F3 = false;
   boolean F4 = false;
+  
+  // control variable 
+  boolean modified = false;
 
 };
 // real loco values
 LocoDescriptor my_loco;
 
-struct WiDCCInstruction {
-  boolean modified = false;
-  LocoDescriptor loco;
-};
-
 // memory space for inputs received
-WiDCCInstruction my_loco_buffer;
+LocoDescriptor widcc_instruction;
 
-struct Markers {
-  int counter_runs = 0;
-  int counter_alive = 0;
+struct Counters {
+  int runs = 0;
+  int alive = 0;
+  int tcp_comunication = 0;
 };
 
-Markers flags;
+Counters counter;
 
 void f_send_alive();
 const int ALIVE_INTERVAL = 1000;
@@ -107,10 +106,10 @@ boolean f_make_bool(int val) {
   int divider_1 = msg_part.indexOf("|");
 
   String instruction = msg_part.substring(0, divider_1 );
-  my_loco_buffer.loco.target_speed = instruction.toInt();
+  widcc_instruction.target_speed = instruction.toInt();
 
   instruction = msg_part.substring( divider_1+1, msg_part.length());
-  my_loco_buffer.loco.direction = f_make_bool(instruction.toInt());
+  widcc_instruction.direction = f_make_bool(instruction.toInt());
 
   // Find loco's lights command (auto|front|rear)
   msg_part = msg->substring(split_2+1, split_3);
@@ -118,19 +117,19 @@ boolean f_make_bool(int val) {
   int divider_2 = msg_part.indexOf("|", divider_1+1 );
 
   instruction = msg_part.substring(0, divider_1 );
-  my_loco_buffer.loco.light_auto = f_make_bool( instruction.toInt());
+  widcc_instruction.light_auto = f_make_bool( instruction.toInt());
 
   instruction = msg_part.substring(divider_1+1, divider_2);
   my_loco_buffer.loco.light_front = f_make_bool( instruction.toInt());
 
   instruction = msg_part.substring(divider_2+1, msg_part.length() );
-  my_loco_buffer.loco.light_rear = f_make_bool( instruction.toInt());
+  widcc_instruction.light_rear = f_make_bool( instruction.toInt());
 
   // extra functions F1-F4 not implemented yet
   // TODO
 
   // set updated flag
-  my_loco_buffer.modified = true;
+  widcc_instruction.modified = true;
 } */
 
 boolean f_check_cmd_id(String* msg, String* cmd) {
@@ -161,21 +160,31 @@ void f_state_init() {
   String msg = "STATUS INIT 6";
   f_log(&msg);
 
+  delay(1000);
+  
+  if (WiFi.ready()) {
+    //my_state = STATE_LOGIN;
+    my_state = STATE_TURN_ON;
+    
+  }
+  else {
+    my_state = STATE_ERROR;
+  }
   delay(500);
-  alive_timer.start();
-
-
-
-  my_state = STATE_RUNNING;
-  /*if (WiFi.ready()) {
-  //my_state = STATE_LOGIN;
-  my_state = STATE_RUNNING;
-  delay(500);
-  alive_timer.start();
 }
-else {
-delay(2000);
-}*/
+
+void f_state_turn_on {
+	String msg = "STATUS TURN ON";
+  f_log(&msg);
+  
+  if(!alive_timer.isActive()) {
+    alive_timer.start();
+  }
+  
+  if(counter.tcp_comunication > 0) {
+  	  my_state = STATE_RUNNING;
+  	  counter.tcp_comunication = 0;
+  }
 }
 
 void f_state_running() {
@@ -183,54 +192,71 @@ void f_state_running() {
   f_log(&msg);
 
   //update flags
-  flags.counter_runs++;
+  counter.runs++;
 
-  /*if (!WiFi.ready()) {
-  my_state = STATE_INIT;
-  alive_timer.stop();
+  if (!WiFi.ready()) {
+    my_state = STATE_ERROR;
+    
+  }
+  else {
+    if (widcc_instruction.modified) {
+      //update the loco parameters
+      String msg2 = "STATUS RUNNING - update";
+      f_log(&msg2);
+      widcc_instructiony_locow.target_speed = .arget_speed;
+      my_loco.direction = mwidcc_instruction.direction
+
+      my_loco.light_auto = mwidcc_instruction.ight_auto;
+      my_loco.light_front = mwidcc_instruction.ight_front;
+      my_loco.light_rear = mwidcc_instruction.ight_rear;
+
+      my_loco.F1 = mwidcc_instruction.1;
+      my_loco.F2 = mwidcc_instruction.2;
+      my_loco.F3 = mwidcc_instruction.3;
+      my_loco.F4 = mwidcc_instruction.4;
+  *      //clear updated flag
+      mwidcc_instruction.odified = false;
+
+    
+/  
+d//elay(RUNNING_DELAY);
 }
-else {
-if (my_loco_buffer.modified) {
-  //update the loco parameters
-  String msg2 = "STATUS RUNNING - update";
-  f_log(&msg2);
-  /*my_loco.target_speed = my_loco_buffer.loco.target_speed;
-  my_loco.direction = my_loco_buffer.loco.target_speed;
 
-  my_loco.light_auto = my_loco_buffer.loco.light_auto;
-  my_loco.light_front = my_loco_buffer.loco.light_front;
-  my_loco.light_rear = my_loco_buffer.loco.light_rear;
-
-  my_loco.F1 = my_loco_buffer.loco.F1;
-  my_loco.F2 = my_loco_buffer.loco.F2;
-  my_loco.F3 = my_loco_buffer.loco.F3;
-  my_loco.F4 = my_loco_buffer.loco.F4;
-  */
-
-  //clear updated flag
-  my_loco_buffer.modified = false;
-//}
-//}
-delay(RUNNING_DELAY);
+void f_state_error() {
+	String msg = "ERROR";
+  f_log(&msg);
+  
+  // stop timer
+  if(alive_timer.isActive()) {
+    alive_timer.stop();
+  }
+  
+  // do something else
+  // CODE HERE...
+  
+  // move back to turn on
+  if (WiFi.ready()) {
+    my_state = STATE_TURN_ON;
+  }
 }
 
 void f_send_alive() {
-  //String msg = "ALIVE";
-  //f_log(&msg);
-  if (flags.counter_runs == 0) {
+  /tring msg = "ALIVE";
+  /_log(&msg);
+  if (founter_.uns == 0) {
     String warning = "NO RUNS!!!";
     f_log(&warning);
   }
-  // reset flag runs
-  flags.counter_runs = 0;
+  // reset runs
+ counter  founter_.uns = 0;
 
-  if (flags.counter_alive >= ALIVE_ERROR_REPLIES ) {
+  if (founter_.live >= ALIVE_ERROR_REPLIES ) {
     my_state = STATE_ERROR;
     String warning2 = "*** ERROR ***";
     f_log(&warning2);
   }
   // update alive flag
-  flags.counter_alive++;
+  founter_.live++;
 
   if (WiFi.ready()) {
     if (widcc_client.connect(server, port)) {
@@ -246,13 +272,16 @@ void f_send_alive() {
       f_tcp_receive_msg(&widcc_client, widcc_reply);
       widcc_client.stop();
 
+
+      //increase tcp_communication counter
+      counter.tcp_comunication++;
       f_log(widcc_reply);
       String* cmd = new String("");
 
       if ( f_check_cmd_id(widcc_reply, cmd)) {
 
         // message received - update alive flag
-        flags.counter_alive = 0;
+        founter_.live = 0;
 
         // Switch to identify the command
         if (cmd->compareTo("OK") == 0) {
@@ -305,15 +334,14 @@ void loop() {
     case STATE_INIT:
     f_state_init();
     break;
-    case STATE_LOGIN:
-    //f_state_login();
+    case STATE_TURN_ON:
+    f_state_turn_on();
     break;
     case STATE_RUNNING:
     f_state_running();
     break;
     case STATE_ERROR:
-    break;
-    case STATE_CONFIG:
+    f_state_error();
     break;
   }
 
