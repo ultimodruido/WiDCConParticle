@@ -16,7 +16,7 @@ enum States my_state;
 
 TCPClient widcc_client;
 
-byte server[] = { 192, 168, 1, 109 };
+byte server[] = { 192, 168, 1, 101 };
 int port = 7246;
 
 struct LocoDescriptor {
@@ -31,8 +31,8 @@ struct LocoDescriptor {
   boolean F2 = false;
   boolean F3 = false;
   boolean F4 = false;
-  
-  // control variable 
+
+  // control variable
   boolean modified = false;
 
 };
@@ -51,7 +51,7 @@ struct Counters {
 Counters counter;
 
 void f_send_alive();
-const int ALIVE_INTERVAL = 1000;
+const int ALIVE_INTERVAL = 3000;
 const int ALIVE_ERROR_REPLIES = 4; // means 2 seconds
 const int RUNNING_DELAY = 100;
 Timer alive_timer( ALIVE_INTERVAL , f_send_alive);
@@ -83,7 +83,7 @@ void f_tcp_receive_msg(TCPClient* widcc_client, String* widcc_reply) {
 }
 
 void f_msg_alive(String* msg) {
-  msg->concat("ALIVE|");
+  msg->concat("[*] ALIVE|");
   msg->concat(System.deviceID());
   msg->concat( String::format("#%u|%u|%u#%u|%u|%u#%u|%u|%u|%u#", \
   my_loco.real_speed, my_loco.target_speed, my_loco.direction, \
@@ -161,11 +161,11 @@ void f_state_init() {
   f_log(&msg);
 
   delay(1000);
-  
+
   if (WiFi.ready()) {
     //my_state = STATE_LOGIN;
     my_state = STATE_TURN_ON;
-    
+
   }
   else {
     my_state = STATE_ERROR;
@@ -173,14 +173,14 @@ void f_state_init() {
   delay(500);
 }
 
-void f_state_turn_on {
+void f_state_turn_on() {
 	String msg = "STATUS TURN ON";
   f_log(&msg);
-  
+
   if(!alive_timer.isActive()) {
     alive_timer.start();
   }
-  
+
   if(counter.tcp_comunication > 0) {
   	  my_state = STATE_RUNNING;
   	  counter.tcp_comunication = 0;
@@ -188,52 +188,52 @@ void f_state_turn_on {
 }
 
 void f_state_running() {
-  String msg = "STATUS RUNNING";
-  f_log(&msg);
+  //String msg = "STATUS RUNNING";
+  //f_log(&msg);
 
   //update flags
   counter.runs++;
 
   if (!WiFi.ready()) {
     my_state = STATE_ERROR;
-    
+
   }
   else {
     if (widcc_instruction.modified) {
       //update the loco parameters
       String msg2 = "STATUS RUNNING - update";
       f_log(&msg2);
-      widcc_instructiony_locow.target_speed = .arget_speed;
-      my_loco.direction = mwidcc_instruction.direction
+      my_loco.target_speed = widcc_instruction.target_speed;
+      my_loco.direction = widcc_instruction.direction;
 
-      my_loco.light_auto = mwidcc_instruction.ight_auto;
-      my_loco.light_front = mwidcc_instruction.ight_front;
-      my_loco.light_rear = mwidcc_instruction.ight_rear;
+      my_loco.light_auto = widcc_instruction.light_auto;
+      my_loco.light_front = widcc_instruction.light_front;
+      my_loco.light_rear = widcc_instruction.light_rear;
 
-      my_loco.F1 = mwidcc_instruction.1;
-      my_loco.F2 = mwidcc_instruction.2;
-      my_loco.F3 = mwidcc_instruction.3;
-      my_loco.F4 = mwidcc_instruction.4;
-  *      //clear updated flag
-      mwidcc_instruction.odified = false;
+      my_loco.F1 = widcc_instruction.F1;
+      my_loco.F2 = widcc_instruction.F2;
+      my_loco.F3 = widcc_instruction.F3;
+      my_loco.F4 = widcc_instruction.F4;
 
-    
-/  
-d//elay(RUNNING_DELAY);
+      //clear updated flag
+      widcc_instruction.modified = false;
+    }
+  }
+//delay(RUNNING_DELAY);
 }
 
 void f_state_error() {
-	String msg = "ERROR";
+	String msg = "STATUS ERROR";
   f_log(&msg);
-  
+
   // stop timer
   if(alive_timer.isActive()) {
     alive_timer.stop();
   }
-  
+
   // do something else
   // CODE HERE...
-  
+
   // move back to turn on
   if (WiFi.ready()) {
     my_state = STATE_TURN_ON;
@@ -241,22 +241,26 @@ void f_state_error() {
 }
 
 void f_send_alive() {
-  /tring msg = "ALIVE";
-  /_log(&msg);
-  if (founter_.uns == 0) {
+  String msg = "ALIVE";
+  f_log(&msg);
+
+  String msg2 = String::format("RUNNING STATUS counter: %i", counter.runs);
+  f_log(&msg2);
+
+  if (counter.runs == 0) {
     String warning = "NO RUNS!!!";
     f_log(&warning);
   }
   // reset runs
- counter  founter_.uns = 0;
+ counter.runs = 0;
 
-  if (founter_.live >= ALIVE_ERROR_REPLIES ) {
-    my_state = STATE_ERROR;
-    String warning2 = "*** ERROR ***";
+  if (counter.alive >= ALIVE_ERROR_REPLIES ) {
+    // my_state = STATE_ERROR;
+    String warning2 = "*** ERROR *** NO ALIVE REPLIES ***";
     f_log(&warning2);
   }
   // update alive flag
-  founter_.live++;
+  counter.alive++;
 
   if (WiFi.ready()) {
     if (widcc_client.connect(server, port)) {
@@ -281,33 +285,42 @@ void f_send_alive() {
       if ( f_check_cmd_id(widcc_reply, cmd)) {
 
         // message received - update alive flag
-        founter_.live = 0;
+        counter.alive = 0;
+
+        String input_received = "Input received: ";
 
         // Switch to identify the command
         if (cmd->compareTo("OK") == 0) {
+          input_received += "OK";
           // display LED GREEN
           RGB.color(0, 255, 0);
         }
         else if ( cmd->compareTo("COMMAND") == 0) {
+          input_received += "COMMAND";
           // display LED BLUE
           RGB.color(0, 0, 255);
           // execute interpreter function
           //f_read_msg_command( widcc_reply );
         }
         else if ( cmd->compareTo("UPDATE") == 0) {
+          input_received += "UPDATE";
           // display LED WHITE
           RGB.color(255, 255, 255);
         }
         else if ( cmd->compareTo("EMERGENCY") == 0) {
+          input_received += "EMERGENCY";
           // display LED RED
           RGB.color(255, 0, 0);
         }
         else if ( cmd->compareTo("IDENTIFY") == 0)  {
+          input_received += "IDENTIFY";
           RGB.color(255, 255, 0);
         }
         else if ( cmd->compareTo("CONFIG") == 0) {
+          input_received += "CONFIG";
           RGB.color(0, 255, 255);
         }
+        f_log(&input_received);
       }
       else {
         // Log wrong device id
@@ -332,17 +345,17 @@ void loop() {
 
   switch (my_state) {
     case STATE_INIT:
-    f_state_init();
-    break;
+      f_state_init();
+      break;
     case STATE_TURN_ON:
-    f_state_turn_on();
-    break;
+      f_state_turn_on();
+      break;
     case STATE_RUNNING:
-    f_state_running();
-    break;
+      f_state_running();
+      break;
     case STATE_ERROR:
-    f_state_error();
-    break;
+      f_state_error();
+      break;
   }
 
 }
