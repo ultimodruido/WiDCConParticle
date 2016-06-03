@@ -44,6 +44,7 @@ struct Counters {
 //////////////////////////////
 // various
 void f_log(String*);
+void f_log_loco();
 boolean f_make_bool(int );
 
 // widcc protocol related
@@ -73,7 +74,7 @@ int port = 7246;
 
 
 // real loco values
-LocoDescriptor my_loco;
+LocoDescriptor loco;
 // memory space for inputs received
 LocoDescriptor widcc_instruction;
 
@@ -99,6 +100,17 @@ void f_log(String* msg) {
 }
 
 
+void f_log_loco() {
+  if ( LOGGING ) {
+    Serial.println(String::format("LOCO speed: %i - %i", loco.real_speed, loco.target_speed));
+    Serial.println(String::format("LOCO direction: %i", loco.direction));
+    Serial.println(String::format("LOCO light: auto %i - front %i - rear %i",  \
+                                loco.light_auto, loco.light_front, loco.light_rear));
+    Serial.println(String::format("LOCO fz: F1 %i - F2 %i - F3 %i - F4 %i",  \
+                                loco.F1, loco.F2, loco.F3, loco.F4));
+  }
+}
+
 /****************
 * WiDCC Protocol
 ***************/
@@ -116,16 +128,16 @@ void f_msg_alive(String* msg) {
   msg->concat("[*] ALIVE|");
   msg->concat(System.deviceID());
   msg->concat( String::format("#%u|%u|%u#%u|%u|%u#%u|%u|%u|%u#", \
-  my_loco.real_speed, my_loco.target_speed, my_loco.direction, \
-  my_loco.light_auto, my_loco.light_front, my_loco.light_rear, \
-  my_loco.F1, my_loco.F2, my_loco.F3, my_loco.F4));
+  loco.real_speed, loco.target_speed, loco.direction, \
+  loco.light_auto, loco.light_front, loco.light_rear, \
+  loco.F1, loco.F2, loco.F3, loco.F4));
 }
 
 boolean f_make_bool(int val) {
   return (1 && val );
 }
 
-/*void f_read_msg_command(String* msg) {
+void f_read_msg_command(String* msg) {
   // Get main message splitters
   int split_1 = msg->indexOf("#");
   int split_2 = msg->indexOf("#", split_1+1);
@@ -150,17 +162,33 @@ boolean f_make_bool(int val) {
   widcc_instruction.light_auto = f_make_bool( instruction.toInt());
 
   instruction = msg_part.substring(divider_1+1, divider_2);
-  my_loco_buffer.loco.light_front = f_make_bool( instruction.toInt());
+  widcc_instruction.light_front = f_make_bool( instruction.toInt());
 
   instruction = msg_part.substring(divider_2+1, msg_part.length() );
   widcc_instruction.light_rear = f_make_bool( instruction.toInt());
 
   // extra functions F1-F4 not implemented yet
-  // TODO
+  msg_part = msg->substring(split_3+1);
+  divider_1 = msg_part.indexOf("|");
+  divider_2 = msg_part.indexOf("|", divider_1+1 );
+
+  instruction = msg_part.substring(0, divider_1 );
+  widcc_instruction.F1 = f_make_bool( instruction.toInt());
+
+  instruction = msg_part.substring(divider_1+1, divider_2);
+  widcc_instruction.F2 = f_make_bool( instruction.toInt());
+
+  divider_1 = msg_part.indexOf("|", divider_2+1 );
+  instruction = msg_part.substring(divider_2+1, divider_1);
+  widcc_instruction.F3 = f_make_bool( instruction.toInt());
+
+  divider_2 = msg_part.indexOf("|", divider_1+1 );
+  instruction = msg_part.substring(divider_1+1, divider_2);
+  widcc_instruction.F4 = f_make_bool( instruction.toInt());
 
   // set updated flag
   widcc_instruction.modified = true;
-} */
+}
 
 boolean f_check_cmd_id(String* msg, String* cmd) {
   int msg_div = msg->indexOf("|");
@@ -233,17 +261,19 @@ void f_state_running() {
       //update the loco parameters
       String msg2 = "STATUS RUNNING - update";
       f_log(&msg2);
-      my_loco.target_speed = widcc_instruction.target_speed;
-      my_loco.direction = widcc_instruction.direction;
+      Serial.println(widcc_instruction.target_speed);
+      loco.target_speed = widcc_instruction.target_speed;
+      Serial.println(loco.target_speed);
+      loco.direction = widcc_instruction.direction;
 
-      my_loco.light_auto = widcc_instruction.light_auto;
-      my_loco.light_front = widcc_instruction.light_front;
-      my_loco.light_rear = widcc_instruction.light_rear;
+      loco.light_auto = widcc_instruction.light_auto;
+      loco.light_front = widcc_instruction.light_front;
+      loco.light_rear = widcc_instruction.light_rear;
 
-      my_loco.F1 = widcc_instruction.F1;
-      my_loco.F2 = widcc_instruction.F2;
-      my_loco.F3 = widcc_instruction.F3;
-      my_loco.F4 = widcc_instruction.F4;
+      loco.F1 = widcc_instruction.F1;
+      loco.F2 = widcc_instruction.F2;
+      loco.F3 = widcc_instruction.F3;
+      loco.F4 = widcc_instruction.F4;
 
       //clear updated flag
       widcc_instruction.modified = false;
@@ -276,6 +306,8 @@ void f_send_alive() {
 
   String msg2 = String::format("RUNNING STATUS counter: %i", counter.runs);
   f_log(&msg2);
+
+  f_log_loco();
 
   if (counter.runs == 0) {
     String warning = "NO RUNS!!!";
@@ -330,7 +362,7 @@ void f_send_alive() {
           // display LED BLUE
           RGB.color(0, 0, 255);
           // execute interpreter function
-          //f_read_msg_command( widcc_reply );
+          f_read_msg_command( widcc_reply );
         }
         else if ( cmd->compareTo("UPDATE") == 0) {
           input_received += "UPDATE";
@@ -363,7 +395,7 @@ void f_send_alive() {
 
 void setup() {
 
-  pinMode(LED, OUTPUT);
+  //pinMode(LED, OUTPUT);
 
   RGB.control(true);
 
