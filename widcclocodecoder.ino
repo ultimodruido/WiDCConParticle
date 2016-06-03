@@ -1,26 +1,22 @@
 /****************
-* Global variables
+* Header section
 ***************/
 
-int LED = D7;
-
+// enumeration for state machine
 enum States {
   STATE_INIT,
   STATE_TURN_ON,
   STATE_RUNNING,
-  //STATE_CONFIG,
   STATE_ERROR
 };
 
-enum States my_state;
-
-TCPClient widcc_client;
-
-byte server[] = { 192, 168, 1, 101 };
-int port = 7246;
-
+// definition of a class containing parameters
+// and configuration of a decoder. it has to be
+// initialzed twice:
+// 1) contains the real decoder values
+// 2) is a buffer for storing the values
+//    transmitted by the server
 struct LocoDescriptor {
-
   int real_speed = 0;
   int target_speed = 0;
   boolean direction = true;
@@ -34,23 +30,57 @@ struct LocoDescriptor {
 
   // control variable
   boolean modified = false;
-
 };
-// real loco values
-LocoDescriptor my_loco;
 
-// memory space for inputs received
-LocoDescriptor widcc_instruction;
-
+// program control variabes are collected in
+// a counters class
 struct Counters {
   int runs = 0;
   int alive = 0;
   int tcp_comunication = 0;
 };
+//////////////////////////////
+// function declaration section
+//////////////////////////////
+// various
+void f_log(String*);
+boolean f_make_bool(int );
 
+// widcc protocol related
+void f_tcp_receive_msg(TCPClient* , String* );
+void f_msg_alive(String* );
+//void f_read_msg_command(String* );
+boolean f_check_cmd_id(String* , String* );
+
+// state machine related
+void f_state_init();
+void f_state_turn_on();
+void f_state_running();
+void f_state_error();
+void f_send_alive();
+
+/****************
+* Global variables
+***************/
+
+// control variable for the state machine
+enum States my_state;
+
+// wifi related variables
+TCPClient widcc_client;
+byte server[] = { 192, 168, 1, 101 };
+int port = 7246;
+
+
+// real loco values
+LocoDescriptor my_loco;
+// memory space for inputs received
+LocoDescriptor widcc_instruction;
+
+// init program control variables
 Counters counter;
 
-void f_send_alive();
+// time related parameters
 const int ALIVE_INTERVAL = 3000;
 const int ALIVE_ERROR_REPLIES = 4; // means 2 seconds
 const int RUNNING_DELAY = 100;
