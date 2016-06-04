@@ -47,11 +47,15 @@ void f_log(String*);
 void f_log_loco();
 boolean f_make_bool(int );
 
-// widcc protocol related
+// widcc protocol related functions
 void f_tcp_receive_msg(TCPClient* , String* );
 void f_msg_alive(String* );
-//void f_read_msg_command(String* );
+void f_read_msg_command(String* );
 boolean f_check_cmd_id(String* , String* );
+
+// loc decoder related functions
+void f_update_loco_params();
+void f_update_loco_speed();
 
 // state machine related
 void f_state_init();
@@ -86,6 +90,8 @@ const int ALIVE_INTERVAL = 3000;
 const int ALIVE_ERROR_REPLIES = 4; // means 2 seconds
 const int RUNNING_DELAY = 100;
 Timer alive_timer( ALIVE_INTERVAL , f_send_alive);
+const int UPDATE_SPEED_INTERVAL = 500;
+Timer speed_timer( UPDATE_SPEED_INTERVAL , f_update_loco_speed);
 
 /****************
 * Logging
@@ -204,6 +210,51 @@ boolean f_check_cmd_id(String* msg, String* cmd) {
 }
 
 /****************
+* Locdecoder related functions
+***************/
+void f_update_loco_params() {
+
+  //update the loco parameters
+  String msg2 = "STATUS RUNNING - update";
+  f_log(&msg2);
+
+  loco.target_speed = widcc_instruction.target_speed;
+  loco.direction = widcc_instruction.direction;
+
+  loco.light_auto = widcc_instruction.light_auto;
+  loco.light_front = widcc_instruction.light_front;
+  loco.light_rear = widcc_instruction.light_rear;
+
+  loco.F1 = widcc_instruction.F1;
+  loco.F2 = widcc_instruction.F2;
+  loco.F3 = widcc_instruction.F3;
+  loco.F4 = widcc_instruction.F4;
+
+  //clear updated flag
+  widcc_instruction.modified = false;
+
+}
+
+void f_update_loco_speed() {
+  // preliminary simple version
+  // just increase the loco speed
+
+  if(loco.real_speed > loco.target_speed) {
+    loco.real_speed--;
+  }
+
+  if(loco.real_speed < loco.target_speed) {
+    loco.real_speed++;
+  }
+
+  if(loco.real_speed == loco.target_speed){
+    //stop update timer
+    speed_timer.stop();
+  }
+
+}
+
+/****************
 * States functions
 ***************/
 
@@ -258,28 +309,16 @@ void f_state_running() {
   }
   else {
     if (widcc_instruction.modified) {
-      //update the loco parameters
-      String msg2 = "STATUS RUNNING - update";
-      f_log(&msg2);
-      Serial.println(widcc_instruction.target_speed);
-      loco.target_speed = widcc_instruction.target_speed;
-      Serial.println(loco.target_speed);
-      loco.direction = widcc_instruction.direction;
-
-      loco.light_auto = widcc_instruction.light_auto;
-      loco.light_front = widcc_instruction.light_front;
-      loco.light_rear = widcc_instruction.light_rear;
-
-      loco.F1 = widcc_instruction.F1;
-      loco.F2 = widcc_instruction.F2;
-      loco.F3 = widcc_instruction.F3;
-      loco.F4 = widcc_instruction.F4;
-
-      //clear updated flag
-      widcc_instruction.modified = false;
+      f_update_loco_params();
     }
   }
-//delay(RUNNING_DELAY);
+
+  if(!speed_timer.isActive()) {
+    if(loco.real_speed != loco.target_speed) {
+      speed_timer.start();
+    }
+  }
+
 }
 
 void f_state_error() {
@@ -306,7 +345,6 @@ void f_send_alive() {
 
   String msg2 = String::format("RUNNING STATUS counter: %i", counter.runs);
   f_log(&msg2);
-
   f_log_loco();
 
   if (counter.runs == 0) {
